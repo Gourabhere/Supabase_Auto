@@ -362,31 +362,3 @@ function upsertToSupabase(tableName, payload) {
 }
 
 
-// ── SET UP 5-MINUTE AUTO TRIGGER ──────────────────────────────────
-function createTrigger() {
-    var triggers = ScriptApp.getProjectTriggers();
-    for (var i = 0; i < triggers.length; i++) {
-        if (triggers[i].getHandlerFunction() === "syncToSupabase") {
-            ScriptApp.deleteTrigger(triggers[i]);
-        }
-    }
-
-    ScriptApp.newTrigger("syncToSupabase")
-        .timeBased()
-        .everyMinutes(5)
-        .create();
-
-    Logger.log("✅ Trigger created! syncToSupabase will run every 5 minutes.");
-}
-
-
-// ── REMOVE TRIGGER ────────────────────────────────────────────────
-function removeTrigger() {
-    var triggers = ScriptApp.getProjectTriggers();
-    for (var i = 0; i < triggers.length; i++) {
-        if (triggers[i].getHandlerFunction() === "syncToSupabase") {
-            ScriptApp.deleteTrigger(triggers[i]);
-        }
-    }
-    Logger.log("✅ All syncToSupabase triggers removed.");
-}
