@@ -51,46 +51,130 @@ var EXPENSE_ROW_MAP = {
 };
 
 
-// ── MAIN SYNC FUNCTION ────────────────────────────────────────────
+// ── MAIN ENTRY (called by trigger every 1 minute) ────────────────
+// Loops 12 times, checking for changes every 5 seconds
 function syncToSupabase() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var tabsToSync = [];
+    var props = PropertiesService.getScriptProperties();
+    var INTERVAL = 5000; // 5 seconds
+    var LOOPS = 11;      // 11 more loops after the first = 12 total × 5s = 60s
 
+    // First check immediately
+    checkAndSync(ss, props);
+
+    // Then loop 11 more times
+    for (var i = 0; i < LOOPS; i++) {
+        Utilities.sleep(INTERVAL);
+        checkAndSync(ss, props);
+    }
+}
+
+// ── CHECK FOR CHANGES AND SYNC ───────────────────────────────────
+function checkAndSync(ss, props) {
+    var tabsToSync = [];
     if (SYNC_TABS === "all") {
-        for (var tabName in TAB_CONFIG) {
-            tabsToSync.push(tabName);
-        }
+        for (var tabName in TAB_CONFIG) tabsToSync.push(tabName);
     } else {
         tabsToSync = SYNC_TABS;
     }
 
-    Logger.log("🚀 Starting sync for: " + tabsToSync.join(", "));
-
+    var anyChanged = false;
     for (var i = 0; i < tabsToSync.length; i++) {
         var tabName = tabsToSync[i];
         var config = TAB_CONFIG[tabName];
+        if (!config || config.table === "SKIP") continue;
 
-        if (!config || config.table === "SKIP") {
-            Logger.log("⏭️ Skipping tab: " + tabName);
-            continue;
-        }
+        var sheet = ss.getSheetByName(tabName);
+        if (!sheet) continue;
 
+        // Compute a quick checksum of the sheet data
+        var data = sheet.getDataRange().getValues();
+        var checksum = computeChecksum(data);
+        var storedKey = "hash_" + tabName;
+        var storedHash = props.getProperty(storedKey);
+
+        if (checksum === storedHash) continue; // No change
+
+        // Data changed — sync this tab
+        anyChanged = true;
+        Logger.log("🔄 Change detected in '" + tabName + "' — syncing...");
         try {
             if (config.custom) {
                 syncExpenseReport2025(ss, tabName, config.table);
             } else {
                 syncOneTab(ss, tabName, config.table, config.headerRow, config.skipColumns || []);
             }
+            props.setProperty(storedKey, checksum);
         } catch (e) {
             Logger.log("❌ Error syncing '" + tabName + "': " + e.message);
         }
     }
 
-    Logger.log("🎉 Sync complete!");
+    if (!anyChanged) {
+        // Silent — no log spam when nothing changed
+    }
+}
+
+// ── SIMPLE CHECKSUM ───────────────────────────────────────────────
+function computeChecksum(data) {
+    var str = "";
+    for (var r = 0; r < data.length; r++) {
+        for (var c = 0; c < data[r].length; c++) {
+            var val = data[r][c];
+            if (val instanceof Date) val = val.getTime();
+            str += String(val) + "|";
+        }
+        str += "\n";
+    }
+    return Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, str)
+        .map(function (b) { return (b < 0 ? b + 256 : b).toString(16).padStart(2, "0"); })
+        .join("");
 }
 
 
-// ── SYNC A SINGLE TAB (generic) ──────────────────────────────────
+// ── SET UP 1-MINUTE TRIGGER (loops 12× inside for ~5s checks) ────
+function createTrigger() {
+    var triggers = ScriptApp.getProjectTriggers();
+    for (var i = 0; i < triggers.length; i++) {
+        if (triggers[i].getHandlerFunction() === "syncToSupabase") {
+            ScriptApp.deleteTrigger(triggers[i]);
+        }
+    }
+
+    ScriptApp.newTrigger("syncToSupabase")
+        .timeBased()
+        .everyMinutes(1)
+        .create();
+
+    Logger.log("✅ Trigger created! Checking for changes every ~5 seconds (1-min trigger × 12 loops).");
+}
+
+
+// ── REMOVE TRIGGER ────────────────────────────────────────────────
+function removeTrigger() {
+    var triggers = ScriptApp.getProjectTriggers();
+    for (var i = 0; i < triggers.length; i++) {
+        if (triggers[i].getHandlerFunction() === "syncToSupabase") {
+            ScriptApp.deleteTrigger(triggers[i]);
+        }
+    }
+    Logger.log("✅ All syncToSupabase triggers removed.");
+}
+
+// ── MANUAL: Force sync all (ignores checksums) ───────────────────
+function forceSyncAll() {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var props = PropertiesService.getScriptProperties();
+
+    // Clear all stored hashes to force re-sync
+    for (var tabName in TAB_CONFIG) {
+        props.deleteProperty("hash_" + tabName);
+    }
+
+    Logger.log("🚀 Force syncing all tabs...");
+    checkAndSync(ss, props);
+    Logger.log("🎉 Force sync complete!");
+}
 function syncOneTab(ss, tabName, tableName, headerRow, skipColumns) {
     var sheet = ss.getSheetByName(tabName);
     if (!sheet) {
