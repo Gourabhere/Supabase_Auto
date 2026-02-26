@@ -197,7 +197,25 @@ function syncExpenseReport2025(ss, tabName, tableName) {
         }
     }
 
-    Logger.log("   � " + payload.length + " rows (merged from Collections + Expenses sections)");
+    Logger.log("   📦 " + payload.length + " rows (merged from Collections + Expenses sections)");
+
+    // Delete existing rows first (no unique constraint, so we clear and re-insert)
+    var delUrl = SUPABASE_URL + "/rest/v1/" + tableName + "?Category=neq.NEVER_MATCH";
+    var delResponse = UrlFetchApp.fetch(delUrl, {
+        method: "delete",
+        headers: {
+            "apikey": SUPABASE_KEY,
+            "Authorization": "Bearer " + SUPABASE_KEY
+        },
+        muteHttpExceptions: true
+    });
+    var delCode = delResponse.getResponseCode();
+    if (delCode >= 200 && delCode < 300) {
+        Logger.log("   🗑️ Cleared old Expense Report rows.");
+    } else {
+        Logger.log("   ⚠️ Delete HTTP " + delCode + ": " + delResponse.getContentText());
+    }
+
     upsertToSupabase(tableName, payload);
 }
 

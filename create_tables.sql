@@ -57,11 +57,12 @@ CREATE TABLE IF NOT EXISTS "Collections_2025" (
 
 -- Tab: "Expense Report 2025" — Custom column + row value mapping
 -- Sheet has 2 sections (Collections rows 2-5, Expenses rows 8+), merged into one table
+-- Category is UNIQUE so upsert updates existing rows instead of duplicating
 DROP TABLE IF EXISTS "Expense_Report_2025";
 CREATE TABLE "Expense_Report_2025" (
   id bigint generated always as identity primary key,
   "SN" text,
-  "Category" text,
+  "Category" text UNIQUE,
   "Aug_2025" text,
   "Sept_2025" text,
   "Oct_2025" text,
