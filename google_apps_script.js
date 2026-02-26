@@ -6,6 +6,7 @@
 // ── CONFIGURATION ──────────────────────────────────────────────────
 var SUPABASE_URL = "https://bhdrlzaqejkrqsozbcbr.supabase.co";
 var SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJoZHJsemFxZWprcnFzb3piY2JyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4NzM4OTAsImV4cCI6MjA4NTQ0OTg5MH0.W1kWS99fv-QjQI_eVE3XvPhMWbgMQoGqOtaUHcVlP9s";
+var SHEET_ID = "1j_z8S7oIfpCGiQ7-Q9qPdXpJ4HDz_iLeYs4R0My4rr8";
 
 // Tab config: "custom" flag means it uses a special sync function
 var TAB_CONFIG = {
@@ -54,7 +55,7 @@ var EXPENSE_ROW_MAP = {
 // ── MAIN ENTRY (called by trigger every 1 minute) ────────────────
 // Loops 12 times, checking for changes every 5 seconds
 function syncToSupabase() {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ss = SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.openById(SHEET_ID);
     var props = PropertiesService.getScriptProperties();
     var INTERVAL = 5000; // 5 seconds
     var LOOPS = 11;      // 11 more loops after the first = 12 total × 5s = 60s
